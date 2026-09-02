@@ -15,38 +15,40 @@ rem   the mkcert.exe binary is downloaded straight from GitHub into
 rem   the local "tools" folder - no package manager required.
 rem ---------------------------------------------------------------
 
-rem ---- locate or fetch mkcert ----
+rem ---- locate mkcert on PATH, else in tools\ ----
 set "MKCERT="
 where mkcert >nul 2>nul
 if not errorlevel 1 set "MKCERT=mkcert"
-if not defined MKCERT (
-    set "LOCALMK=%~dp0tools\mkcert.exe"
-    if exist "%LOCALMK%" (
-        set "MKCERT=%LOCALMK%"
-    ) else (
-        echo [mkcert] Not found - downloading from GitHub...
-        if not exist "%~dp0tools" mkdir "%~dp0tools"
-        powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install-mkcert.ps1" -OutFile "%LOCALMK%"
-        if exist "%LOCALMK%" (
-            set "MKCERT=%LOCALMK%"
-        ) else (
-            echo.
-            echo  ERROR: could not download mkcert. Your machine may not trust GitHub's
-            echo  TLS certificate, or the connection was blocked.
-            echo.
-            echo  Workarounds:
-            echo    1) Download it in your browser and save it here, then re-run:
-            echo         https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe
-            echo       place it at:
-            echo         %~dp0tools\mkcert.exe
-            echo    2) Or download the installer and put mkcert.exe on your PATH.
-            echo.
-            pause
-            exit /b 1
-        )
-    )
+
+set "LOCALMK=%~dp0tools\mkcert.exe"
+if not defined MKCERT if exist "%LOCALMK%" set "MKCERT=%LOCALMK%"
+
+rem ---- if we still have no mkcert, try to download it ----
+if defined MKCERT goto :havecert
+
+echo [mkcert] Not found - downloading from GitHub...
+if not exist "%~dp0tools" mkdir "%~dp0tools"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install-mkcert.ps1" -OutFile "%LOCALMK%"
+
+if exist "%LOCALMK%" (
+    set "MKCERT=%LOCALMK%"
+    goto :havecert
 )
 
+echo.
+echo  ERROR: could not download mkcert. Your machine may not trust GitHub's
+echo  TLS certificate, or the connection was blocked.
+echo.
+echo  Workaround - download it in your browser and save it to this file,
+echo  then re-run this script:
+echo     %LOCALMK%
+echo  Direct download link:
+echo     https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe
+echo.
+pause
+exit /b 1
+
+:havecert
 rem ---- auto-detect the primary LAN IPv4 ----
 for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%CD%\scripts\detect-ip.ps1"`) do set "LANIP=%%i"
 if not defined LANIP set "LANIP=127.0.0.1"

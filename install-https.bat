@@ -26,14 +26,20 @@ if not defined MKCERT (
     ) else (
         echo [mkcert] Not found - downloading from GitHub...
         if not exist "%~dp0tools" mkdir "%~dp0tools"
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe' -OutFile \"%~dp0tools\mkcert.exe\""
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install-mkcert.ps1" -OutFile "%LOCALMK%"
         if exist "%LOCALMK%" (
             set "MKCERT=%LOCALMK%"
         ) else (
             echo.
-            echo  ERROR: could not download mkcert. Check your internet connection,
-            echo  or download it manually and place it here:
-            echo      %~dp0tools\mkcert.exe
+            echo  ERROR: could not download mkcert. Your machine may not trust GitHub's
+            echo  TLS certificate, or the connection was blocked.
+            echo.
+            echo  Workarounds:
+            echo    1) Download it in your browser and save it here, then re-run:
+            echo         https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe
+            echo       place it at:
+            echo         %~dp0tools\mkcert.exe
+            echo    2) Or download the installer and put mkcert.exe on your PATH.
             echo.
             pause
             exit /b 1

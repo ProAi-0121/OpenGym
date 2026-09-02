@@ -43,6 +43,9 @@ function webAuthnContext(req) {
   if (/^https?:\/\//i.test(oh)) origin = oh;
   let rpID = RP_ID;
   try { rpID = new URL(origin).hostname || RP_ID; } catch {}
+  // Surface what the API actually used, so an RP-ID mismatch is visible in the api window
+  // instead of only as a browser error ("...not a registrable domain suffix...").
+  if (rpID !== RP_ID) console.log(`webauthn: origin=${origin} -> rpID=${rpID} (configured RP_ID=${RP_ID})`);
   return { origin, rpID, secure: /^https:/i.test(origin) };
 }
 

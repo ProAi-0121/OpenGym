@@ -11,9 +11,11 @@ const media = process.env.MEDIA_TARGET || 'http://127.0.0.1:8888'
 const dataDir = process.env.DATA_DIR || path.resolve(process.cwd(), '../data')
 const certFile = path.join(dataDir, 'opengym-cert.pem')
 const keyFile = path.join(dataDir, 'opengym-key.pem')
-const https = fs.existsSync(certFile) && fs.existsSync(keyFile)
-  ? { cert: fs.readFileSync(certFile), key: fs.readFileSync(keyFile) }
-  : undefined
+const https = (process.env.DISABLE_HTTPS && /^(1|true|yes|on)$/i.test(process.env.DISABLE_HTTPS))
+  ? undefined
+  : (fs.existsSync(certFile) && fs.existsSync(keyFile)
+      ? { cert: fs.readFileSync(certFile), key: fs.readFileSync(keyFile) }
+      : undefined)
 
 export default defineConfig({
   plugins: [react()],

@@ -9,15 +9,36 @@ rem   Installs mkcert (if missing), installs its local CA into THIS
 rem   machine's trust store, and generates a certificate for your LAN IP.
 rem   Copy the generated data\mkcert-rootCA.pem to OTHER devices and
 rem   trust it there too, so their browsers accept this server.
+rem
+rem   Works without winget (e.g. Windows 8.1): if mkcert is not found,
+rem   the mkcert.exe binary is downloaded straight from GitHub into
+rem   the local "tools" folder - no package manager required.
 rem ---------------------------------------------------------------
 
-rem ---- make sure mkcert is available (install via winget if needed) ----
+rem ---- locate or fetch mkcert ----
+set "MKCERT="
 where mkcert >nul 2>nul
-if errorlevel 1 (
-    echo Installing mkcert via winget...
-    winget install FiloSottile.mkcert --accept-package-agreements --accept-source-agreements
-    rem refresh PATH for this session
-    set "PATH=%PATH%;%LOCALAPPDATA%\Microsoft\WinGet\Links"
+if not errorlevel 1 set "MKCERT=mkcert"
+if not defined MKCERT (
+    set "LOCALMK=%~dp0tools\mkcert.exe"
+    if exist "%LOCALMK%" (
+        set "MKCERT=%LOCALMK%"
+    ) else (
+        echo [mkcert] Not found - downloading from GitHub...
+        if not exist "%~dp0tools" mkdir "%~dp0tools"
+        powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-windows-amd64.exe' -OutFile \"%~dp0tools\mkcert.exe\""
+        if exist "%LOCALMK%" (
+            set "MKCERT=%LOCALMK%"
+        ) else (
+            echo.
+            echo  ERROR: could not download mkcert. Check your internet connection,
+            echo  or download it manually and place it here:
+            echo      %~dp0tools\mkcert.exe
+            echo.
+            pause
+            exit /b 1
+        )
+    )
 )
 
 rem ---- auto-detect the primary LAN IPv4 ----
@@ -26,10 +47,10 @@ if not defined LANIP set "LANIP=127.0.0.1"
 
 rem ---- install the local CA and generate certs covering LAN IP + localhost ----
 echo Installing local CA into the system trust store...
-mkcert -install
+"%MKCERT%" -install
 
 echo Generating HTTPS certificate for %LANIP%, localhost, 127.0.0.1 ...
-mkcert -key-file data\opengym-key.pem -cert-file data\opengym-cert.pem %LANIP% localhost 127.0.0.1
+"%MKCERT%" -key-file data\opengym-key.pem -cert-file data\opengym-cert.pem %LANIP% localhost 127.0.0.1
 
 rem ---- expose the root CA so other devices can trust it ----
 if exist "%LOCALAPPDATA%\mkcert\rootCA.pem" copy /y "%LOCALAPPDATA%\mkcert\rootCA.pem" data\mkcert-rootCA.pem >nul

@@ -30,6 +30,22 @@ const MAX_BODY = 5 * 1024 * 1024;
 // Secure cookies require HTTPS; over plain http://localhost the flag would drop the cookie
 const SECURE = /^https:/i.test(ORIGIN) ? ' Secure;' : '';
 
+// Passkeys are bound to the exact hostname the browser is on. When the app is reachable
+// through several front doors at once (LAN IP, localhost, an http tunnel...), no single
+// fixed RP_ID can match them all — hence "the relying party ID is not a registrable
+// domain suffix of, nor equal to the current domain". So derive origin + rpID from the
+// request's Origin header (browsers always send it on POST, and page JS cannot forge it),
+// falling back to the configured ORIGIN / RP_ID when it is absent. Same scheme also decides
+// the session cookie's Secure flag, so an http origin still gets a usable session cookie.
+function webAuthnContext(req) {
+  let origin = ORIGIN;
+  const oh = String(req.headers.origin || '');
+  if (/^https?:\/\//i.test(oh)) origin = oh;
+  let rpID = RP_ID;
+  try { rpID = new URL(origin).hostname || RP_ID; } catch {}
+  return { origin, rpID, secure: /^https:/i.test(origin) };
+}
+
 fs.mkdirSync(DATA, { recursive: true });
 
 /* ---------- secret + db ---------- */
@@ -197,10 +213,20 @@ function requireAdmin(req, res) {
   if (!isAdmin(user)) { json(res, 403, { error: 'forbidden' }); return null; }
   return user;
 }
-function sessionCookie(user) {
-  return `gymsid=${makeSession(user)}; Path=/; Max-Age=${SESSION_DAYS * 86400}; HttpOnly;${SECURE} SameSite=Lax`;
+function sessionCookie(user, secure) {
+  const flag = secure ? ' Secure;' : '';
+  return `gymsid=${makeSession(user)}; Path=/; Max-Age=${SESSION_DAYS * 86400}; HttpOnly;${flag} SameSite=Lax`;
 }
-const clearCookie = `gymsid=; Path=/; Max-Age=0; HttpOnly;${SECURE} SameSite=Lax`;
+const clearCookieFor = secure => {
+  const flag = secure ? ' Secure;' : '';
+  return `gymsid=; Path=/; Max-Age=0; HttpOnly;${flag} SameSite=Lax`;
+};
+// Clear both variants (array → two Set-Cookie headers) so a session minted on either
+// scheme is always dropped, whatever origin the logout request comes from.
+const clearCookie = [
+  'gymsid=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+  'gymsid=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax'
+];
 
 /* ---------- challenge store (in-memory, 5 min TTL) ---------- */
 const challenges = new Map(); // cid -> {challenge, name?, uid?, exp}
@@ -274,8 +300,9 @@ const routes = {
     if (INVITE_ONLY && !db.invites.some(i => i.code === code && !i.usedBy && !i.revoked))
       return json(res, 403, { error: 'a valid invite code is required' });
     const uid = crypto.randomBytes(12).toString('base64url');
+    const wa = webAuthnContext(req);
     const options = await generateRegistrationOptions({
-      rpName: RP_NAME, rpID: RP_ID,
+      rpName: RP_NAME, rpID: wa.rpID,
       userID: Buffer.from(uid), userName: name, userDisplayName: name,
       attestationType: 'none',
       authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
@@ -290,12 +317,13 @@ const routes = {
     const c = takeChallenge(body.cid);
     if (!c || !c.uid) return json(res, 400, { error: 'challenge expired — try again' });
     let verification;
+    const wa = webAuthnContext(req);
     try {
       verification = await verifyRegistrationResponse({
         response: body.credential,
         expectedChallenge: c.challenge,
-        expectedOrigin: ORIGIN,
-        expectedRPID: RP_ID,
+        expectedOrigin: wa.origin,
+        expectedRPID: wa.rpID,
         requireUserVerification: false
       });
     } catch (e) { return json(res, 400, { error: 'verification failed: ' + e.message }); }
@@ -318,12 +346,13 @@ const routes = {
       transports: body.credential?.response?.transports || []
     });
     saveDb();
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user, wa.secure) });
   },
 
   'POST /api/login/options': async (req, res) => {
+    const wa = webAuthnContext(req);
     const options = await generateAuthenticationOptions({
-      rpID: RP_ID, userVerification: 'preferred', allowCredentials: []
+      rpID: wa.rpID, userVerification: 'preferred', allowCredentials: []
     });
     const cid = putChallenge({ challenge: options.challenge });
     json(res, 200, { cid, options });
@@ -336,12 +365,13 @@ const routes = {
     const cred = db.creds.find(x => x.id === body.credential?.id);
     if (!cred) return json(res, 404, { error: 'unknown passkey — create a profile first' });
     let verification;
+    const wa = webAuthnContext(req);
     try {
       verification = await verifyAuthenticationResponse({
         response: body.credential,
         expectedChallenge: c.challenge,
-        expectedOrigin: ORIGIN,
-        expectedRPID: RP_ID,
+        expectedOrigin: wa.origin,
+        expectedRPID: wa.rpID,
         requireUserVerification: false,
         credential: {
           id: cred.id,
@@ -357,7 +387,7 @@ const routes = {
     const user = db.users.find(u => u.id === cred.userId);
     if (!user) return json(res, 500, { error: 'user missing' });
     if (user.disabled) return json(res, 403, { error: 'this account has been disabled' });
-    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user) });
+    json(res, 200, { user: { id: user.id, name: user.name, admin: isAdmin(user) } }, { 'Set-Cookie': sessionCookie(user, wa.secure) });
   },
 
   'POST /api/logout': async (req, res) => json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie }),

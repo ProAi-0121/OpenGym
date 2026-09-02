@@ -4,19 +4,20 @@ title openGym - Tunnel Launcher (plain HTTP)
 cd /d "%~dp0"
 
 rem ---------------------------------------------------------------
-rem  openGym for use behind an HTTP tunneling system.
+rem  openGym for use behind a tunneling system / reverse proxy.
 rem
-rem  Your tunnel publishes a plain-http URL (e.g. http://IP:PORT/)
-rem  that forwards to this machine's port 5173. So the local web
-rem  server MUST run as plain HTTP (Vite TLS is disabled here), or
-rem  the tunnel can't proxy it - HTTPS-to-HTTP gives errors / blank.
+rem  Your proxy terminates HTTPS publicly (e.g. https://harsh.run.place)
+rem  and forwards plain http to this machine's port 5173. So the local
+rem  web server MUST run as plain HTTP (Vite TLS is disabled here), or
+rem  the proxy can't reach it - HTTPS-to-HTTP gives errors / blank.
 rem
-rem  EDIT THIS to match your tunnel's public URL:
-set "TUNNEL_URL=http://141.148.197.20:1010"
+rem  EDIT THIS to match your public URL:
+set "TUNNEL_URL=https://harsh.run.place"
 
-rem  NOTE: over plain http the browser will NOT allow passkey login.
-rem  This launcher is for viewing/using the app through the tunnel.
-rem  For passkeys you need an HTTPS tunnel (Cloudflare/ngrok).
+rem  With a real domain, passkeys are bound to that hostname - the most
+rem  stable setup (they survive LAN IP changes). The API derives the RP ID
+rem  from the browser's Origin header, so it matches automatically, as long
+rem  as your proxy forwards the Origin header (Cloudflare and ngrok do).
 rem ---------------------------------------------------------------
 
 rem ---- one-time dependency install (skipped if already done) ----
@@ -57,9 +58,10 @@ echo  - Point your tunnel client at localhost:5173 (target_local_port).
 echo  - Once the tunnel is up, open the public URL:
 echo      %TUNNEL_URL%
 echo.
-echo  NOTE: plain http means passkey login is disabled. This is for
-echo  using the app through the tunnel. Use LAN HTTPS (start-openGym.bat)
-echo  for passkey login.
+echo  Passkeys: bound to the hostname in TUNNEL_URL (=%RP_ID%).
+echo  They work as long as the public side is https and your proxy
+echo  forwards the browser's Origin header. If you ever change the
+echo  domain, existing passkeys must be re-created (new profile).
 echo.
 pause
 endlocal

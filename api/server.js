@@ -1,5 +1,7 @@
 /* opengym-api — passkey (WebAuthn) auth + per-user state storage for openGym
    No framework, JSON-file storage, signed session cookies.               */
+// Must be first: polyfills globalThis.crypto on Node 18 (Windows 8.1)
+import './crypto-polyfill.js';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';

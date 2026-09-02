@@ -21,8 +21,8 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   server: {
-    // Bind to all interfaces so the dev server is reachable from other devices on your LAN.
     host: '0.0.0.0',
+    allowedHosts: ['harsh.run.place'],
     https,
     proxy: {
       '/api': { target: backend, changeOrigin: true },

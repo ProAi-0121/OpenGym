@@ -3,7 +3,13 @@ export const IS_APPLE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)
 export const IS_ANDROID = /Android/.test(navigator.userAgent)
 export const BIO = IS_APPLE ? 'Face ID / Touch ID' : IS_ANDROID ? 'fingerprint or face unlock' : 'your fingerprint, face or PIN'
 export const VAULT = IS_APPLE ? 'iCloud Keychain' : IS_ANDROID ? 'Google Password Manager' : 'your password manager'
-export const webauthnOK = () => !!(window.PublicKeyCredential && navigator.credentials)
+// WebAuthn is only available in a secure context (https, or localhost). Browsers still
+// expose window.PublicKeyCredential / navigator.credentials on plain http, so without the
+// isSecureContext check the buttons would render and then silently do nothing.
+export const webauthnOK = () => !!(window.PublicKeyCredential && navigator.credentials) && window.isSecureContext !== false
+// True when the browser *does* support passkeys but the page is on plain http — the case
+// that deserves its own "you need HTTPS" message rather than "browser unsupported".
+export const webauthnInsecure = () => !!(window.PublicKeyCredential && navigator.credentials) && window.isSecureContext === false
 
 export async function api(path, opts) {
   const r = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts))

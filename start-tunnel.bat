@@ -49,7 +49,7 @@ echo    Tunnel URL : %TUNNEL_URL%
 echo    API origin : %ORIGIN%
 start "openGym - media (tunnel)" cmd /k "cd /d %~dp0media && python -m http.server 8888"
 start "openGym - api   (tunnel)" cmd /k "cd /d %~dp0api && node server.js"
-start "openGym - web   (tunnel)" cmd /k "set DISABLE_HTTPS=1 && cd /d %~dp0frontend && npm run dev"
+start "openGym - web   (tunnel)" cmd /k "cd /d %~dp0frontend && set "DISABLE_HTTPS=1" && npm run dev"
 
 echo.
 echo  All servers are running.

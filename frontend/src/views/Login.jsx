@@ -1,6 +1,6 @@
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
-import { webauthnOK, passkeyLogin, passkeyRegister, api, BIO } from '../lib/api.js'
+import { webauthnOK, webauthnInsecure, passkeyLogin, passkeyRegister, api, BIO } from '../lib/api.js'
 import { hasData } from '../store/useStore.js'
 import { t } from '../lib/i18n.js'
 import { DEMO, REPO } from '../lib/demo.js'
@@ -78,7 +78,9 @@ export default function Login() {
         <div style={{ height: 10 }} />
         <Button icon="sparkles" onClick={() => useUI.getState().openSheet(close => <RegisterSheet close={close} />)}>{t('Create new profile')}</Button>
         <div style={{ height: 10 }} />
-      </> : <div className="card small muted" style={{ textAlign: 'left' }}>{t("This browser doesn't support passkeys — you can still use openGym locally on this device.")}</div>}
+      </> : <div className="card small muted" style={{ textAlign: 'left' }}>{webauthnInsecure()
+        ? t('Passkeys need a secure connection — open this page over https:// (localhost also works) to sign in.')
+        : t("This browser doesn't support passkeys — you can still use openGym locally on this device.")}</div>}
       <Button variant="ghost" className="dim" onClick={() => setGuest(true)}>{t('Continue without account')}</Button>
       <div className="dim small" style={{ marginTop: 26, lineHeight: 1.5 }}>{t('Passkeys use {0} — no passwords.', BIO)}<br />{t('Each profile keeps its own plan, workouts & body weight.')}</div>
     </div>
